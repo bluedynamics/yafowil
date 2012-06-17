@@ -143,31 +143,82 @@ def generic_required_extractor(widget, data):
     raise ExtractionError(widget.attrs['required_message'])
 
 
-def input_attributes_common(widget, data):
-    input_attrs = {
-        'autofocus': widget.attrs.get('autofocus') and 'autofocus' or None,
+def html5_common_attributes(widget, data):
+    attrs = {
+        'accesskey': widget.attrs.get('accesskey'),
         'class_': cssclasses(widget, data),
-        'disabled': bool(widget.attrs.get('disabled')) and 'disabled' or None,
+        'contenteditable': widget.attrs.get('contenteditable')\
+                           and 'contenteditable' or None,
+        'contextmenu': widget.attrs.get('contextmenu'),
+        'dir': widget.attrs.get('dir'),
+        'dragable': widget.attrs.get('dragable'),
+        'dropzone': widget.attrs.get('dropzone'),
+        'hidden': widget.attrs.get('hidden'),
         'id': cssid(widget, 'input'),
+        'lang': widget.attrs.get('lang'),
+        'spellcheck': widget.attrs.get('spellcheck'),
+        'style': widget.attrs.get('style'),
+        'tabindex': widget.attrs.get('tabindex'),
+        'title': widget.attrs.get('title'),
+    }
+    return attrs
+
+def formel_attributes_common(widget, data):
+    html5_attrs = html5_common_attributes(widget, data)
+    formel_attrs = {
+        'autofocus': widget.attrs.get('autofocus') and 'autofocus' or None,
+        'disabled': bool(widget.attrs.get('disabled')) and 'disabled' or None,
+        'maxlength': widget.attrs['maxlength'],
         'name_': widget.dottedpath,
         'placeholder': widget.attrs.get('placeholder') or None,
+        'readonly': widget.attrs.get('readonly') and 'readonly' or None,
         'required': widget.attrs.get('required') and 'required' or None,
+    }
+    return html5_attrs.update(formel_attrs)
+
+def input_attributes(widget, data):
+    formel_attrs = formel_attributes_common(widget, data)
+    input_attrs = {
+        'autocomplete': widget.attrs.get('autocomplete'),
+        'list': widget.attrs.get('list') or None,
+        'multiple': widget.attrs.get('multiple') or None,
+        'pattern': widget.attrs.get('pattern') or None,
         'size': widget.attrs.get('size'),
-        'title': widget.attrs.get('title') or None,
         'type': widget.attrs.get('type') or None,
         'value': fetch_value(widget, data),
     }
-    return input_attrs
 
+    if widget.attrs['type'] == 'checkbox':
+        if widget.attrs['checked'] is not None:
+            if widget.attrs['checked']:
+                input_attrs['checked'] = 'checked'
+        else:
+            input_attrs['checked'] = input_attrs['value'] and 'checked' or None
 
-def input_attributes_full(widget, data):
-    input_attrs = input_attributes_common(widget, data)
-    input_attrs['autocomplete'] = widget.attrs.get('autocomplete')
-    if widget.attrs['type'] in ['range', 'number']:
+    if widget.attrs['type'] == 'file':
+        input_attrs['accept'] = widget.attrs.get('accept') or None
+
+    if widget.attrs['type'] == 'image':
+        input_attrs['alt'] = widget.attrs.get('alt') or None
+        input_attrs['height'] = widget.attrs.get('height') or None
+        input_attrs['src'] = widget.attrs.get('src') or None
+        input_attrs['width'] = widget.attrs.get('width') or None
+
+    if widget.attrs['type'] in ['range', 'number', 'date', 'datetime',
+                                'datetime-local']:
         input_attrs['min'] = widget.attrs.get('min') or None
         input_attrs['max'] = widget.attrs.get('min') or None
         input_attrs['step'] = widget.attrs.get('step') or None
-    return input_attrs
+
+    return formel_attrs.update(input_attrs)
+
+def textarea_attributes(widget, data):
+    formel_attrs = formel_attributes_common(widget, data)
+    return formel_attrs.update({
+        'cols': widget.attrs['cols'],
+        'rows': widget.attrs['rows'],
+        'wrap': widget.attrs['wrap'],
+    })
 
 
 @managedprops('type', 'size', 'disabled', 'autofocus', 'placeholder',
@@ -298,21 +349,6 @@ factory.defaults['proxy.class'] = None
 ###############################################################################
 # textarea
 ###############################################################################
-
-def textarea_attributes(widget, data):
-    return {
-        'autofocus': widget.attrs.get('autofocus') and 'autofocus' or None,
-        'class_': cssclasses(widget, data),
-        'cols': widget.attrs['cols'],
-        'id': cssid(widget, 'input'),
-        'name_': widget.dottedpath,
-        'placeholder': widget.attrs.get('placeholder') or None,
-        'readonly': widget.attrs['readonly'] and 'readonly',
-        'required': widget.attrs.get('required') and 'required' or None,
-        'rows': widget.attrs['rows'],
-        'wrap': widget.attrs['wrap'],
-    }
-
 
 @managedprops('wrap', 'cols', 'rows', 'readonly', 'autofocus', 'placeholder',
               *css_managed_props)
@@ -624,13 +660,8 @@ def checkbox_extractor(widget, data):
 def checkbox_edit_renderer(widget, data):
     tag = data.tag
 
-    input_attrs = input_attributes_common(widget, data)
-    input_attrs['type'] = 'checkbox'
-    if widget.attrs['checked'] is not None:
-        if widget.attrs['checked']:
-            input_attrs['checked'] = 'checked'
-    else:
-        input_attrs['checked'] = input_attrs['value'] and 'checked' or None
+    input_attrs = input_attributes(widget, data)
+    input_attrs['type'] = 'checkbox' # TODO: should be set in widget
     if widget.attrs['format'] == 'bool':
         input_attrs['value'] = ''
     checkbox = tag('input', **input_attrs)
